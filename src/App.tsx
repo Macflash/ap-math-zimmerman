@@ -146,7 +146,8 @@ function fromResult(str: string){
 
   // parse the string and turn it into rows and set the rows...
   const splits = str.split("},");
-  const order = (rows.length + 1) / 2;
+  const order = (splits.length + 1) / 2;
+  console.log("I think it is order", order);
   const enteredRows = createRows(order);
 
   // this doesn't handle DEAD CELLS!
@@ -212,11 +213,6 @@ let bestRows: number[][] = [];
 function App() {
   const [tries, setTries] = React.useState(10);
   const [order, setOrder] = React.useState(startOrder);
-  React.useEffect(() => {
-    rows = createRows(order);
-    best = 0;
-    rerender();
-  }, [order, setOrder]);
 
   const [, setNonce] = React.useState(Math.random());
   const rerender = React.useCallback(() => setNonce(Math.random()), [setNonce]);
@@ -232,7 +228,10 @@ function App() {
       <div style={{ display: "flex", flexDirection: "row", justifyContent: "space-around", padding: 10 }}>
         <button onClick={() => { clear(rows); rerender(); }}>Clear</button>
         <span>Order: <input type="number" value={order} onChange={e => {
-          setOrder(Number.parseInt(e.target.value));
+          const newOrder = Number.parseInt(e.target.value)
+          setOrder(newOrder);
+          rows = createRows(newOrder);
+          best = 0;
           rerender();
         }} /></span>
         <span> Score: {currentCount}</span>
