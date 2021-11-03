@@ -45,33 +45,6 @@ function createRows(order: number) {
 
 var rows: number[][] = createRows(startOrder);
 
-function midPoint(i: number, j: number, oi: number, oj: number) {
-  // i first...
-
-}
-
-function doublePoint(di: number, dj: number, order: number) {
-  // for every j over HALF? we subtract 1?
-  if (di >= order) {
-    // double crosses boundary
-    console.log("across!", di, order, di - order);
-    dj -= (di - order) + 1;
-  }
-
-  if (rows[di] && rows[di][dj] >= 0) {
-    console.log("adding double point", di, dj);
-    rows[di][dj] = 2;
-  }
-}
-
-function ForEveryPoint(map: number[][], func: (map: number[][], row: number, col: number, value: number) => void) {
-  map.forEach((arr, row) => {
-    arr.forEach((value, col) => {
-      func(map, row, col, value);
-    });
-  });
-}
-
 function setInRows(rows: number[][], coord: DoubledCoord, value: number) {
   const c = coord.toRowAndColumn();
   if (rows[c.row] && rows[c.row][c.col] >= 0) {
@@ -85,6 +58,7 @@ function setInRows(rows: number[][], coord: DoubledCoord, value: number) {
 // 2 is blocked! (already a mid point!)
 function addNewDot(rows: number[][], i: number, j: number) {
   if (rows[i][j] != 0) { return; }
+  console.log("Adding dot", i,j);
 
   const newDot = DoubledCoord.FromRowAndColumn(i, j);
 
@@ -104,10 +78,7 @@ function addNewDot(rows: number[][], i: number, j: number) {
 
         // TODO block mid point
         // mid point should be AVERAGE og the 2 spots.
-        console.log("new", newDot);
-        console.log("other", otherDot);
         const midDot = DoubledCoord.multiply(DoubledCoord.add(otherDot, newDot), .5);
-        console.log("avg", DoubledCoord.multiply(DoubledCoord.add(otherDot, newDot), .5));
         const mid = midDot.toRowAndColumn();
         setInRows(rows, midDot, 2);
       }
@@ -170,6 +141,34 @@ function result(rows: number[][]) {
   }).join(', ');
 }
 
+function fromResult(str: string){
+  console.log("entered!");
+
+  // parse the string and turn it into rows and set the rows...
+  const splits = str.split("},");
+  const order = (rows.length + 1) / 2;
+  const enteredRows = createRows(order);
+
+  // this doesn't handle DEAD CELLS!
+  splits.forEach((row, i) => {
+    row = row.replace("{", "");
+    row = row.replace("}", "");
+    console.log("row", row);
+    const cells = row.split(",").map(c => Number.parseInt(c.trim())).filter(n => !isNaN(n));
+    console.log(cells);
+    // j needs to be offset by number of deadcells in that row.
+    const deadcells = enteredRows[i].filter(x => x===-1).length;
+    cells.forEach(j => {
+      addNewDot(enteredRows, i, j + deadcells);
+    });
+  });
+
+  return {
+    order,
+    rows: enteredRows,
+  };
+}
+
 function randomOpenCell(rows: number[][]) {
   let selected = { row: 0, col: 0 };
   let curMax = -1;
@@ -188,13 +187,33 @@ function randomOpenCell(rows: number[][]) {
   return selected;
 }
 
+function fillOne(rows: number[][], tries = 10) {
+  // ideally search open cells for whatever adds the LEAST blocked tiles
+  // or just check a few 
+  let lowestBlocked = 999999999999999;
+  let lowestRows = rows;
+  for (let i = 0; i < tries; i++) {
+    const randomCell = randomOpenCell(rows);
+    const newRows = copy(rows);
+    addNewDot(newRows, randomCell.row, randomCell.col);
+    const blocked = countBlocked(newRows);
+    if (blocked < lowestBlocked) {
+      lowestBlocked = blocked;
+      lowestRows = newRows;
+    }
+  }
+
+  return lowestRows;
+}
+
 let best = 0;
 let bestRows: number[][] = [];
 
 function App() {
+  const [tries, setTries] = React.useState(10);
   const [order, setOrder] = React.useState(startOrder);
   React.useEffect(() => {
-    createRows(order);
+    rows = createRows(order);
     best = 0;
     rerender();
   }, [order, setOrder]);
@@ -221,57 +240,59 @@ function App() {
       </div>
 
       <div>
-        Current: <input style={{ maxWidth: 100 }} value={result(rows)} onChange={(e) => {
-          // parse the string and turn it into rows and set the rows...
-
+        Current: <input style={{ maxWidth: 2000 }} value={result(rows)} onChange={(e) => {
           const str = e.target.value;
-
-          const splits = str.split("},");
-
-          const enteredRows = createRows((rows.length + 1)/ 2);
-
-          splits.forEach((row, i) => {
-            row = row.replace("{", "");
-            console.log("row", row);
-            const cells = row.split(",").map(c => Number.parseInt(c.trim())).filter(n => !isNaN(n));
-            console.log(cells);
-            cells.forEach(j => {
-              addNewDot(enteredRows, i, j);
-            });
-          });
-
-          rows = enteredRows;
+          const result = fromResult(str);
+          rows = result.rows;
+          setOrder(result.order);
           rerender();
-        }} />
-        Best<input style={{ maxWidth: 100 }} value={result(bestRows)} />
+        }} />  Best<input style={{ maxWidth: 200 }} value={result(bestRows)} />
+
+      </div>
+      <div>
+        Tries: <input type="number" value={tries} style={{width: 50}} onChange={(e)=>setTries(Number.parseInt(e.target.value))} />
         <button onClick={() => {
           try {
-            // ideally search open cells for whatever adds the LEAST blocked tiles
-            // or just check a few 
-
-            let lowestBlocked = 999999999999999;
-            let lowestRows = rows;
-            const checkNum = 10;
-            for (let i = 0; i < checkNum; i++) {
-              const randomCell = randomOpenCell(rows);
-              const newRows = copy(rows);
-              addNewDot(newRows, randomCell.row, randomCell.col);
-              const blocked = countBlocked(newRows);
-              if (blocked < lowestBlocked) {
-                lowestBlocked = blocked;
-                lowestRows = newRows;
-              }
-            }
-
-            rows = lowestRows;
+            rows = fillOne(rows, tries);
             rerender();
           }
           catch { }
         }}>Fill NEXT</button>
+        <button onClick={() => {
+          const fillerFunc = () =>{
+            try{
+              rows = fillOne(rows, tries);
+              rerender();
+              setTimeout(fillerFunc, 0);
+            }
+            catch {};
+          }
+
+          fillerFunc();
+        }}>Fill All</button>
+        <button onClick={() => {
+          let count = 0;
+          let maxCount = 10;
+          const fillerFunc = () =>{
+            if(count > maxCount){ return;}
+            try{
+              rows = fillOne(rows, tries);
+              rerender();
+              setTimeout(fillerFunc, 0);
+            }
+            catch {
+              count++;
+              clear(rows);
+              setTimeout(fillerFunc, 0);
+            };
+          };
+          fillerFunc();
+        }}>Fill 10</button>
       </div>
 
       <div style={{ position: "relative" }}>
-        {order < 19 ? rows.map((r, i) => <div key={i} style={{ display: "flex", justifyContent: "center" }}>
+        {order > 50 ? "Sorry this is too big right now. Set order to 50 or less." : null}
+        {order <= 50 ? rows.map((r, i) => <div key={i} style={{ display: "flex", justifyContent: "center" }}>
           {r.map((x, j) => {
             let color = "white";
             switch (x) {
