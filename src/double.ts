@@ -21,6 +21,8 @@ export function CreateDoubledArray(order: number) {
     return rows;
 }
 
+export interface Cell { row: number, col: number};
+
 export class DoubledCoord {
     constructor(public x: number, public y: number) { }
 
@@ -30,7 +32,7 @@ export class DoubledCoord {
 
     toString() { return `${this.x}, ${this.y}` };
 
-    toRowAndColumn() {
+    toRowAndColumn(): Cell {
         let row = this.x;
         let col = (this.y + this.x) / 2;
         return { row, col };

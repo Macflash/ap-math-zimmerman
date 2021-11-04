@@ -1,7 +1,7 @@
 import { create } from 'domain';
 import React from 'react';
 import './App.css';
-import { DoubledCoord } from './double';
+import { Cell, DoubledCoord } from './double';
 
 interface Hex {
   x: number;
@@ -52,18 +52,8 @@ function setInRows(rows: number[][], coord: DoubledCoord, value: number) {
   }
 }
 
-// -1 is empty cell, just for offset, always ignore these and never set a value there
-// 0 is empty
-// 1 is filled
-// 2 is blocked! (already a mid point!)
-function addNewDot(rows: number[][], i: number, j: number) {
-  if (rows[i][j] != 0) { return; }
-  // console.log("Adding dot", i,j);
-
-  const newDot = DoubledCoord.FromRowAndColumn(i, j);
-
-  // for EVERY non-0 spot we need to find a mid point. if INTEGER then we block them
-
+function getDoubleCoords(rows: number[][], newDot: DoubledCoord){
+  const doublePts: DoubledCoord[] = [];
   rows.forEach((arr, row) => {
     arr.forEach((x, col) => {
       if (x === 1) {
@@ -73,19 +63,73 @@ function addNewDot(rows: number[][], i: number, j: number) {
         const diff = DoubledCoord.subtract(newDot, otherDot);
         const double1 = DoubledCoord.add(newDot, diff);
         const double2 = DoubledCoord.add(otherDot, DoubledCoord.multiply(diff, -1));
-        setInRows(rows, double1, 3);
-        setInRows(rows, double2, 3);
-
-        // TODO block mid point
-        // mid point should be AVERAGE og the 2 spots.
-        const midDot = DoubledCoord.multiply(DoubledCoord.add(otherDot, newDot), .5);
-        const mid = midDot.toRowAndColumn();
-        setInRows(rows, midDot, 2);
+        doublePts.push(double1);
+        doublePts.push(double2);
       }
+      });
     });
+
+    return doublePts;
+}
+
+function getMiddleCoords(rows: number[][], newDot: DoubledCoord){
+  const middlePts: DoubledCoord[] = [];
+  rows.forEach((arr, row) => {
+    arr.forEach((x, col) => {
+      if (x === 1) {
+        const otherDot = DoubledCoord.FromRowAndColumn(row, col);
+        const midDot = DoubledCoord.multiply(DoubledCoord.add(otherDot, newDot), .5);
+        middlePts.push(midDot);
+      }
+      });
+    });
+
+    return middlePts;
+}
+
+// -1 is empty cell, just for offset, always ignore these and never set a value there
+// 0 is empty
+// 1 is filled
+// 2 is blocked! (already a mid point!)
+function addNewDot(rows: number[][], i: number, j: number) {
+  if (rows[i][j] != 0) { return; }
+
+  const newDot = DoubledCoord.FromRowAndColumn(i, j);
+
+  const doublePts = getDoubleCoords(rows, newDot);
+  doublePts.forEach(pt => {
+    setInRows(rows, pt, 3);
+  });
+
+  const middlePts = getMiddleCoords(rows, newDot);
+  middlePts.forEach(pt => {
+    setInRows(rows, pt, 2);
   })
 
   rows[i][j] = 1;
+}
+
+function testAddNewDot(rows: number[][], i: number, j: number) {
+  if (rows[i][j] != 0) { return Number.MAX_SAFE_INTEGER; }
+
+  const newDot = DoubledCoord.FromRowAndColumn(i, j);
+  const doublePts = getDoubleCoords(rows, newDot);
+  const middlePts = getMiddleCoords(rows, newDot);
+
+  const newPts: {[key:string]: boolean} = {};
+
+  let count = 0;
+  doublePts.forEach(pt => {
+    if(!newPts[pt.toString()]) count++;
+    newPts[pt.toString()] = true;
+  });
+
+  middlePts.forEach(pt => {
+    if(!newPts[pt.toString()]) count++;
+    newPts[pt.toString()] = true;
+  });
+
+  return count;
 }
 
 function iterRowCol(rows: number[][], func: (value: number, row: number, col: number, rows: number[][]) => void) {
@@ -268,20 +312,24 @@ function old_randomOpenCell(rows: number[][]) {
 function fillOne(rows: number[][], tries = 10) {
   // ideally search open cells for whatever adds the LEAST blocked tiles
   // or just check a few 
-  let lowestBlocked = 999999999999999;
-  let lowestRows = rows;
+  let lowestBlocked = Number.MAX_SAFE_INTEGER;
+  let lowestCell: Cell | null = null;
   for (let i = 0; i < tries; i++) {
+    // This is a lot of overhead. really we just want to check what NEW ones would be added.
     const randomCell = fast_randomOpenCell(rows);
-    const newRows = copy(rows);
-    addNewDot(newRows, randomCell.row, randomCell.col);
-    const blocked = countBlocked(newRows);
+    const blocked = testAddNewDot(rows, randomCell.row, randomCell.col);
+    // this should be outdated now and is way slower (i hope)
+    // const newRows = copy(rows);
+    // addNewDot(newRows, randomCell.row, randomCell.col);
+    // const blocked = countBlocked(newRows);
     if (blocked < lowestBlocked) {
       lowestBlocked = blocked;
-      lowestRows = newRows;
+      lowestCell = randomCell;
     }
   }
 
-  return lowestRows;
+  addNewDot(rows, lowestCell!.row, lowestCell!.col);
+  return rows;
 }
 
 let best = 0;
