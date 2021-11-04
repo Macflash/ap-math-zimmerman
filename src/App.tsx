@@ -58,7 +58,7 @@ function setInRows(rows: number[][], coord: DoubledCoord, value: number) {
 // 2 is blocked! (already a mid point!)
 function addNewDot(rows: number[][], i: number, j: number) {
   if (rows[i][j] != 0) { return; }
-  console.log("Adding dot", i,j);
+  // console.log("Adding dot", i,j);
 
   const newDot = DoubledCoord.FromRowAndColumn(i, j);
 
@@ -141,7 +141,7 @@ function result(rows: number[][]) {
   }).join(', ');
 }
 
-function fromResult(str: string){
+function fromResult(str: string) {
   console.log("entered!");
 
   // parse the string and turn it into rows and set the rows...
@@ -158,7 +158,7 @@ function fromResult(str: string){
     const cells = row.split(",").map(c => Number.parseInt(c.trim())).filter(n => !isNaN(n));
     console.log(cells);
     // j needs to be offset by number of deadcells in that row.
-    const deadcells = enteredRows[i].filter(x => x===-1).length;
+    const deadcells = enteredRows[i].filter(x => x === -1).length;
     cells.forEach(j => {
       addNewDot(enteredRows, i, j + deadcells);
     });
@@ -170,10 +170,87 @@ function fromResult(str: string){
   };
 }
 
+function getRandom(max: number) {
+  return Math.floor(Math.random() * max);
+}
+
+function randomOrder(num: number) {
+  // place a random order or 1-num in an array.
+  var arr = [];
+  for (let i = 0; i < num; i++) {
+    arr.push({
+      index: i,
+      rand: Math.random()
+    });
+  }
+  arr.sort((a, b) => a.rand - b.rand);
+  return arr.map(x => x.index);
+}
+
+function time(count: number, func: () => void) {
+  const start = performance.now();
+
+  for (let i = 0; i < count; i++) {
+    func();
+  }
+
+  return performance.now() - start;
+}
+
+console.log(() => {
+  console.log("testing!");
+
+  const newtime = time(1000, () => randomOpenCell(rows));
+  console.log("new time!", newtime);
+
+  const oldtime = time(1000, () => old_randomOpenCell(rows));
+
+  console.log("old time!", oldtime);
+
+});
+
 function randomOpenCell(rows: number[][]) {
+  const rowOrder = randomOrder(rows.length);
+  for (let i = 0; i < rows.length; i++) {
+    const row = rowOrder[i];
+    const row_arr = rows[row];
+
+    const openIndexes: number[] = [];
+    row_arr.forEach((x, col) => {
+      if (x === 0) {
+        openIndexes.push(col);
+      }
+    });
+
+    if (openIndexes.length) {
+      const col = getRandom(openIndexes.length);
+      return { row, col };
+    }
+  }
+
+  throw "FULL!";
+}
+
+// This checks every cell currently, which is quite impractical at larger sizes
+function fast_randomOpenCell(rows: number[][]) {
+  // this like.. DIES at the end....
+  for(let i = 0; i < 10000; i++){
+    const row = getRandom(rows.length);
+    const col = getRandom(rows[row].length);
+    if(rows[row][col] === 0){
+      return {row,col};
+    }
+  }
+  return old_randomOpenCell(rows);
+}
+
+// This checks every cell currently, which is quite impractical at larger sizes
+function old_randomOpenCell(rows: number[][]) {
   let selected = { row: 0, col: 0 };
   let curMax = -1;
   let full = true;
+
+  // pick a random open cell 
   iterRowCol(rows, (x, row, col) => {
     if (x === 0) {
       full = false;
@@ -194,7 +271,7 @@ function fillOne(rows: number[][], tries = 10) {
   let lowestBlocked = 999999999999999;
   let lowestRows = rows;
   for (let i = 0; i < tries; i++) {
-    const randomCell = randomOpenCell(rows);
+    const randomCell = fast_randomOpenCell(rows);
     const newRows = copy(rows);
     addNewDot(newRows, randomCell.row, randomCell.col);
     const blocked = countBlocked(newRows);
@@ -211,6 +288,7 @@ let best = 0;
 let bestRows: number[][] = [];
 
 function App() {
+  const [scale, setScale] = React.useState(100);
   const [tries, setTries] = React.useState(10);
   const [order, setOrder] = React.useState(startOrder);
 
@@ -223,10 +301,41 @@ function App() {
     bestRows = copy(rows);
   }
 
+  const canvasRef = React.useRef<HTMLCanvasElement>(null);
+  if(canvasRef.current){
+    const context = canvasRef.current.getContext("2d")!;
+    const w = canvasRef.current.width = window.innerWidth;
+    const h = canvasRef.current.height = window.innerHeight - 120;
+    context.clearRect(0,0,w,h);
+    context.fillStyle = "black";
+    context.fillRect(0,0,w,h);
+
+    const scale = h / rows.length;
+
+    iterRowCol(rows, (value, row,col)=>{
+      let color = "white";
+      switch (value) {
+        case -1: color = "lightgrey"; return;
+        case 1: color = "red"; break;
+        case 2: case 3: color = "grey"; break;
+      }
+
+      context.fillStyle = color;
+      const y = (DoubledCoord.FromRowAndColumn(row, col).x) * scale;
+      const x = (DoubledCoord.FromRowAndColumn(row, col).y + order) * (scale) / 2;
+      context.fillRect(x,y,scale,scale);
+    });
+  }
+
   return (
     <div className="App" >
       <div style={{ display: "flex", flexDirection: "row", justifyContent: "space-around", padding: 10 }}>
         <button onClick={() => { clear(rows); rerender(); }}>Clear</button>
+        <span>Scale: <input type="range" min="1" max="100" value={scale} onChange={e => {
+          const newScale = Number.parseFloat(e.target.value);
+          setScale(newScale);
+          rerender();
+        }} /></span>
         <span>Order: <input type="number" value={order} onChange={e => {
           const newOrder = Number.parseInt(e.target.value)
           setOrder(newOrder);
@@ -245,11 +354,11 @@ function App() {
           rows = result.rows;
           setOrder(result.order);
           rerender();
-        }} />  Best<input style={{ maxWidth: 200 }} value={result(bestRows)} />
+        }} />  Best: <input readOnly style={{ maxWidth: 200 }} value={result(bestRows)} />
 
       </div>
       <div>
-        Tries: <input type="number" value={tries} style={{width: 50}} onChange={(e)=>setTries(Number.parseInt(e.target.value))} />
+        Tries: <input type="number" value={tries} style={{ width: 50 }} onChange={(e) => setTries(Number.parseInt(e.target.value))} />
         <button onClick={() => {
           try {
             rows = fillOne(rows, tries);
@@ -258,13 +367,13 @@ function App() {
           catch { }
         }}>Fill NEXT</button>
         <button onClick={() => {
-          const fillerFunc = () =>{
-            try{
+          const fillerFunc = () => {
+            try {
               rows = fillOne(rows, tries);
               rerender();
               setTimeout(fillerFunc, 0);
             }
-            catch {};
+            catch { };
           }
 
           fillerFunc();
@@ -272,9 +381,9 @@ function App() {
         <button onClick={() => {
           let count = 0;
           let maxCount = 10;
-          const fillerFunc = () =>{
-            if(count > maxCount){ return;}
-            try{
+          const fillerFunc = () => {
+            if (count > maxCount) { return; }
+            try {
               rows = fillOne(rows, tries);
               rerender();
               setTimeout(fillerFunc, 0);
@@ -289,8 +398,9 @@ function App() {
         }}>Fill 10</button>
       </div>
 
-      <div style={{ position: "relative" }}>
-        {order > 50 ? "Sorry this is too big right now. Set order to 50 or less." : null}
+      {order > 50 ? <canvas style={{display:"block", width: "100%", height: "100%"}} ref={canvasRef}></canvas> : null}
+
+      <div style={{ position: "relative", scale: `${scale / 100}` }}>
         {order <= 50 ? rows.map((r, i) => <div key={i} style={{ display: "flex", justifyContent: "center" }}>
           {r.map((x, j) => {
             let color = "white";
