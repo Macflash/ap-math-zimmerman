@@ -2,6 +2,7 @@ import { create } from 'domain';
 import React from 'react';
 import './App.css';
 import { Cell, DoubledCoord } from './double';
+import { createRows, iterRowCol } from './hexgrid';
 
 interface Hex {
   x: number;
@@ -14,35 +15,6 @@ function distance(a: Hex, b: Hex): number {
 
 const startOrder = 4;
 
-function createRows(order: number) {
-  let rows: number[][] = [];
-  // rows start at ORDER, and increase by 1 per row, reaching (2*ORDER) - 1 then decrease
-  let rowLength = order;
-  for (let i = 0; i < order; i++) {
-    rows[i] = [];
-    for (let j = 0; j < rowLength; j++) {
-      rows[i][j] = 0;
-    }
-    rowLength++;
-  }
-
-  // instead of shrinking OFFSET the new ones!
-  let deadCells = 0;
-  for (let i = order; i < order * 2 - 1; i++) {
-    rows[i] = [];
-    deadCells++;
-    rowLength--;
-    for (let j = 0; j < rowLength + deadCells - 1; j++) {
-      rows[i][j] = 0;
-      if (j < deadCells) {
-        rows[i][j] = -1;
-      }
-    }
-  }
-
-  return rows;
-}
-
 var rows: number[][] = createRows(startOrder);
 
 function setInRows(rows: number[][], coord: DoubledCoord, value: number) {
@@ -52,7 +24,7 @@ function setInRows(rows: number[][], coord: DoubledCoord, value: number) {
   }
 }
 
-function getDoubleCoords(rows: number[][], newDot: DoubledCoord){
+function getDoubleCoords(rows: number[][], newDot: DoubledCoord) {
   const doublePts: DoubledCoord[] = [];
   rows.forEach((arr, row) => {
     arr.forEach((x, col) => {
@@ -66,13 +38,13 @@ function getDoubleCoords(rows: number[][], newDot: DoubledCoord){
         doublePts.push(double1);
         doublePts.push(double2);
       }
-      });
     });
+  });
 
-    return doublePts;
+  return doublePts;
 }
 
-function getMiddleCoords(rows: number[][], newDot: DoubledCoord){
+function getMiddleCoords(rows: number[][], newDot: DoubledCoord) {
   const middlePts: DoubledCoord[] = [];
   rows.forEach((arr, row) => {
     arr.forEach((x, col) => {
@@ -81,10 +53,10 @@ function getMiddleCoords(rows: number[][], newDot: DoubledCoord){
         const midDot = DoubledCoord.multiply(DoubledCoord.add(otherDot, newDot), .5);
         middlePts.push(midDot);
       }
-      });
     });
+  });
 
-    return middlePts;
+  return middlePts;
 }
 
 // -1 is empty cell, just for offset, always ignore these and never set a value there
@@ -116,28 +88,20 @@ function testAddNewDot(rows: number[][], i: number, j: number) {
   const doublePts = getDoubleCoords(rows, newDot);
   const middlePts = getMiddleCoords(rows, newDot);
 
-  const newPts: {[key:string]: boolean} = {};
+  const newPts: { [key: string]: boolean } = {};
 
   let count = 0;
   doublePts.forEach(pt => {
-    if(!newPts[pt.toString()]) count++;
+    if (!newPts[pt.toString()]) count++;
     newPts[pt.toString()] = true;
   });
 
   middlePts.forEach(pt => {
-    if(!newPts[pt.toString()]) count++;
+    if (!newPts[pt.toString()]) count++;
     newPts[pt.toString()] = true;
   });
 
   return count;
-}
-
-function iterRowCol(rows: number[][], func: (value: number, row: number, col: number, rows: number[][]) => void) {
-  rows.forEach((arr, row) => {
-    arr.forEach((value, col) => {
-      func(value, row, col, rows);
-    });
-  });
 }
 
 function countOnes(rows: number[][]) {
@@ -147,15 +111,6 @@ function countOnes(rows: number[][]) {
   });
   return count;
 }
-
-function countBlocked(rows: number[][]) {
-  let count = 0;
-  iterRowCol(rows, (x) => {
-    if (x > 1) { count++; }
-  });
-  return count;
-}
-
 
 function clear(rows: number[][]) {
   iterRowCol(rows, (x, row, col) => {
@@ -278,11 +233,11 @@ function randomOpenCell(rows: number[][]) {
 // This checks every cell currently, which is quite impractical at larger sizes
 function fast_randomOpenCell(rows: number[][]) {
   // this like.. DIES at the end....
-  for(let i = 0; i < 10000; i++){
+  for (let i = 0; i < 10000; i++) {
     const row = getRandom(rows.length);
     const col = getRandom(rows[row].length);
-    if(rows[row][col] === 0){
-      return {row,col};
+    if (rows[row][col] === 0) {
+      return { row, col };
     }
   }
   return old_randomOpenCell(rows);
@@ -350,17 +305,17 @@ function App() {
   }
 
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
-  if(canvasRef.current){
+  if (canvasRef.current) {
     const context = canvasRef.current.getContext("2d")!;
     const w = canvasRef.current.width = window.innerWidth;
     const h = canvasRef.current.height = window.innerHeight - 120;
-    context.clearRect(0,0,w,h);
+    context.clearRect(0, 0, w, h);
     context.fillStyle = "black";
-    context.fillRect(0,0,w,h);
+    context.fillRect(0, 0, w, h);
 
     const scale = h / rows.length;
 
-    iterRowCol(rows, (value, row,col)=>{
+    iterRowCol(rows, (value, row, col) => {
       let color = "white";
       switch (value) {
         case -1: color = "lightgrey"; return;
@@ -371,7 +326,7 @@ function App() {
       context.fillStyle = color;
       const y = (DoubledCoord.FromRowAndColumn(row, col).x) * scale;
       const x = (DoubledCoord.FromRowAndColumn(row, col).y + order) * (scale) / 2;
-      context.fillRect(x,y,scale,scale);
+      context.fillRect(x, y, scale, scale);
     });
   }
 
@@ -444,9 +399,45 @@ function App() {
           };
           fillerFunc();
         }}>Fill 10</button>
+
+        <button onClick={() => {
+          // if FULL clear(rows);
+          const fillerFunc = () => {
+            try {
+              const row = rows[order - 1];
+              const newRow = fillOne([row], tries);
+              rows[order - 1] = newRow[0];
+              rerender();
+              setTimeout(fillerFunc, 0);
+            }
+            catch { };
+          }
+
+          fillerFunc();
+        }}>Fill middle row</button>
+        
+        {/* <button onClick={() => {
+          // where are the corners?
+          // 2 in first row.
+          // 2 in middle row
+          // 2 in last row (after dead cells)
+          const fillerFunc = () => {
+            try {
+              const row = rows[order - 1];
+              const newRow = fillOne([row], tries);
+              rows[order - 1] = newRow[0];
+              rerender();
+              setTimeout(fillerFunc, 0);
+            }
+            catch { };
+          }
+
+          fillerFunc();
+        }}>Fill near corners</button> */}
+
       </div>
 
-      {order > 50 ? <canvas style={{display:"block", width: "100%", height: "100%"}} ref={canvasRef}></canvas> : null}
+      {order > 50 ? <canvas style={{ display: "block", width: "100%", height: "100%" }} ref={canvasRef}></canvas> : null}
 
       <div style={{ position: "relative", scale: `${scale / 100}` }}>
         {order <= 50 ? rows.map((r, i) => <div key={i} style={{ display: "flex", justifyContent: "center" }}>
