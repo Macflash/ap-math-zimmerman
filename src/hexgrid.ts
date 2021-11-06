@@ -32,7 +32,7 @@ class CellSet {
     }
 }
 
-export class Grid {
+export class HexGrid {
     // Store all cells in an offset hex grid
     private rows: number[][];
 

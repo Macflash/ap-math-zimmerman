@@ -2,7 +2,7 @@ import { create } from 'domain';
 import React from 'react';
 import './App.css';
 import { Cell, DoubledCoord } from './double';
-import { createRows, iterRowCol } from './hexgrid';
+import { createRows, HexGrid, iterRowCol } from './hexgrid';
 
 interface Hex {
   x: number;
