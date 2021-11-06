@@ -1,15 +1,77 @@
 import { Cell, DoubledCoord } from "./double";
 
+class CellSet {
+    private map = new Map<string, Cell>();
+    constructor(private readonly value: number, rows?: number[][]) {
+        if (!rows) { return; }
+        iterRowCol(rows, (value, row, col) => {
+            if (this.value === value) {
+                this.add(row, col);
+            }
+        });
+    }
+
+    private key(i: number, j: number) {
+        return `${i},${j}`;
+    }
+
+    add(row: number, col: number) {
+        try {
+            this.map.set(this.key(row, col), { row, col });
+        } catch { }
+    }
+
+    remove(row: number, col: number) {
+        try {
+            this.map.delete(this.key(row, col));
+        } catch { }
+    }
+
+    iter(callback: (cell: Cell) => void) {
+        this.map.forEach(callback);
+    }
+}
+
 export class Grid {
     // Store all cells in an offset hex grid
     private rows: number[][];
 
-    // We will want to update this whenever we change the grid
-    private counts: CellCount;
+    private filledCells: CellSet = new CellSet(1);
+    private openCells: CellSet;
 
     constructor(public readonly order: number) {
         this.rows = createRows(order);
-        this.counts = countRows(this.rows);
+        this.openCells = new CellSet(0, this.rows);
+    }
+
+    private blockCell(row: number, col: number, overwriteFilledCells = false) {
+        if (this.rows[row][col] < 0) { return; }
+        // By default don't block already filled cells!
+        if (this.rows[row][col] === 1 && !overwriteFilledCells) { return; }
+        this.rows[row][col] = 2;
+        this.openCells.remove(row, col);
+        if (overwriteFilledCells) this.filledCells.remove(row, col);
+    }
+
+    fillCell(row: number, col: number) {
+        // We don't allow this!
+        if (this.rows[row][col] != 0) { return; }
+
+        const newCell = DoubledCoord.FromRowAndColumn(row, col);
+
+        // iter filled cells (oo fancy!)
+        this.filledCells.iter(cell => {
+            const otherCell = DoubledCoord.FromRowAndColumn(cell.row, cell.col);
+            const doubleCells = DoubledCoord.DoublePoints(newCell, otherCell).map(coord => coord.toRowAndColumn());
+            const middleCell = DoubledCoord.MidPoint(newCell, otherCell).toRowAndColumn();
+            this.blockCell(doubleCells[0].row, doubleCells[0].col);
+            this.blockCell(doubleCells[1].row, doubleCells[1].col);
+            this.blockCell(middleCell.row, middleCell.col);
+        })
+
+        this.rows[row][col] = 1;
+        this.filledCells.add(row, col);
+        this.openCells.remove(row, col);
     }
 
     ToResult() {

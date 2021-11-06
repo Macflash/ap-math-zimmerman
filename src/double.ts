@@ -21,7 +21,7 @@ export function CreateDoubledArray(order: number) {
     return rows;
 }
 
-export interface Cell { row: number, col: number};
+export interface Cell { row: number, col: number };
 
 export class DoubledCoord {
     constructor(public x: number, public y: number) { }
@@ -48,5 +48,17 @@ export class DoubledCoord {
 
     static multiply(a: DoubledCoord, k: number) {
         return new DoubledCoord(a.x * k, a.y * k);
+    }
+
+    static DoublePoints(a: DoubledCoord, b: DoubledCoord) {
+        const diff = DoubledCoord.subtract(a, b);
+        return [
+            DoubledCoord.add(a, diff),
+            DoubledCoord.add(b, DoubledCoord.multiply(diff, -1))
+        ];
+    }
+
+    static MidPoint(a: DoubledCoord, b: DoubledCoord) {
+        return DoubledCoord.multiply(DoubledCoord.add(a, b), .5);
     }
 }
